@@ -195,6 +195,10 @@
           <button class="btn-main" id="btn-pdf" type="button">Descargar PDF</button>
           <span class="status" id="status"></span>
         </div>
+        <p id="movilhint" hidden class="hint" style="margin:9px 0 0">
+          En el celular se abre el menú de compartir: elegí <b>Guardar en Archivos</b>
+          para tenerlo en el teléfono, o mandalo directo por WhatsApp o mail.
+        </p>
         <p style="margin:10px 0 0"><a id="fallback" hidden target="_blank" rel="noopener"
            style="font-size:13px;color:var(--brand);font-weight:600"></a></p>
 
@@ -768,35 +772,62 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     try{ blob = buildPdf().output("blob"); }
     catch(e){ say(els.status, "No se pudo armar el PDF.", "bad"); return; }
 
-    var url;
+    var url, file = null;
     try{ url = URL.createObjectURL(blob); }
     catch(e){ say(els.status, "El navegador no dejó preparar el archivo.", "bad"); return; }
+    try{ file = new File([blob], name, {type:"application/pdf"}); }catch(e){}
 
-    // el camino normal: un enlace de descarga que se clickea solo
-    var clicked = false;
-    try{
-      var a = document.createElement("a");
-      a.href = url; a.download = name; a.rel = "noopener";
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      clicked = true;
-    }catch(e){ clicked = false; }
+    function bump(msg, kind){
+      var nxt = nextNro(els.nro.value);
+      if(nxt){ els.nro.value = nxt; store(NRO_KEY, nxt); paint(); }
+      say(els.status, msg + " El próximo sale con el N° " + (nxt || els.nro.value) + ".", kind || "good");
+    }
 
-    // y siempre un enlace visible por si el navegador bloqueó el automático
-    var fb = document.getElementById("fallback");
-    fb.href = url;
-    fb.download = name;
-    fb.hidden = false;
-    fb.textContent = clicked ? "¿No apareció? Abrí el PDF acá" : "Abrí el PDF acá";
+    function mostrarEnlace(txt){
+      var fb = document.getElementById("fallback");
+      fb.href = url; fb.download = name; fb.hidden = false; fb.textContent = txt;
+    }
+
+    function bajarComoArchivo(){
+      try{
+        var a = document.createElement("a");
+        a.href = url; a.download = name; a.rel = "noopener"; a.style.display = "none";
+        document.body.appendChild(a); a.click(); a.remove();
+        mostrarEnlace("¿No apareció? Abrí el PDF acá");
+        bump("Listo.");
+      }catch(e){
+        mostrarEnlace("Abrí el PDF acá");
+        say(els.status, "Usá el enlace de abajo para abrir el PDF.", "bad");
+      }
+    }
+
+    // En celular el navegador no baja archivos: abre la hoja de compartir,
+    // que es de donde se guarda en Archivos o se manda por WhatsApp.
+    var esMovil = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent || "");
+    var puedeCompartir = !!(file && navigator.share && navigator.canShare &&
+                            navigator.canShare({files:[file]}));
+
+    if(esMovil && puedeCompartir){
+      navigator.share({files:[file], title:name}).then(function(){
+        bump("Listo.");
+      }).catch(function(err){
+        if(err && (err.name === "AbortError" || err.name === "NotAllowedError")){
+          say(els.status, "Se canceló el envío.", "");
+          mostrarEnlace("Abrir el PDF");
+          return;
+        }
+        bajarComoArchivo();
+      });
+    }else if(esMovil){
+      // sin API de compartir: al menos que se abra en su propia pestaña
+      var w = window.open(url, "_blank");
+      mostrarEnlace("Abrir el PDF");
+      bump(w ? "Se abrió el PDF en otra pestaña." : "Abrilo con el enlace de abajo.", w ? "good" : "bad");
+    }else{
+      bajarComoArchivo();
+    }
+
     setTimeout(function(){ URL.revokeObjectURL(url); }, 600000);
-
-    var nxt = nextNro(els.nro.value);
-    if(nxt){ els.nro.value = nxt; store(NRO_KEY, nxt); paint(); }
-    say(els.status, clicked
-      ? "Listo. El próximo sale con el N° " + (nxt || els.nro.value) + "."
-      : "Us\u00E1 el enlace de abajo para abrir el PDF.", clicked ? "good" : "bad");
   });
 
   // the running number lives in this browser, so the next presupuesto picks up where the last left off
@@ -828,6 +859,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   if(saved) els.nro.value = saved;
   var savedSerie = recall(SERIE_KEY);
   if(savedSerie) els.serie.value = savedSerie;
+
+  if(/iPad|iPhone|iPod|Android/i.test(navigator.userAgent || "")){
+    document.getElementById("movilhint").hidden = false;
+  }
 
   try{ if(window.self !== window.top) document.getElementById("framed").hidden = false; }catch(e){
     document.getElementById("framed").hidden = false;
