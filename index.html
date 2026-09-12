@@ -221,6 +221,9 @@
   </div>
 
   <footer class="note">
+    <span style="display:inline-block;padding:2px 7px;border-radius:5px;background:var(--field);
+          border:1px solid var(--line);font-size:11.5px;font-weight:600;letter-spacing:.04em">v3</span>
+    
     El membrete es el mismo archivo de Word de Team MV, convertido a fondo de p&aacute;gina. El texto se dibuja encima con los mismos m&aacute;rgenes del documento original (3&nbsp;cm laterales, 6&nbsp;cm superior).
   </footer>
 </div>
@@ -804,25 +807,30 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     // En celular el navegador no baja archivos: abre la hoja de compartir,
     // que es de donde se guarda en Archivos o se manda por WhatsApp.
     var esMovil = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent || "");
-    var puedeCompartir = !!(file && navigator.share && navigator.canShare &&
-                            navigator.canShare({files:[file]}));
+    var payload = file ? {files:[file], title:name} : null;
+    var puedeCompartir = false;
+    if(esMovil && payload && navigator.share){
+      puedeCompartir = true;                       // si canShare no existe, probamos igual
+      try{ if(navigator.canShare) puedeCompartir = navigator.canShare(payload); }
+      catch(e){ puedeCompartir = false; }
+    }
 
-    if(esMovil && puedeCompartir){
-      navigator.share({files:[file], title:name}).then(function(){
+    if(puedeCompartir){
+      mostrarEnlace("Abrir el PDF en el visor");
+      navigator.share(payload).then(function(){
         bump("Listo.");
       }).catch(function(err){
         if(err && (err.name === "AbortError" || err.name === "NotAllowedError")){
           say(els.status, "Se canceló el envío.", "");
-          mostrarEnlace("Abrir el PDF");
           return;
         }
-        bajarComoArchivo();
+        say(els.status, "Este navegador no deja compartir el archivo. Abrilo con el enlace y usá el botón de compartir del navegador.", "bad");
       });
     }else if(esMovil){
-      // sin API de compartir: al menos que se abra en su propia pestaña
       var w = window.open(url, "_blank");
-      mostrarEnlace("Abrir el PDF");
-      bump(w ? "Se abrió el PDF en otra pestaña." : "Abrilo con el enlace de abajo.", w ? "good" : "bad");
+      mostrarEnlace("Abrir el PDF en el visor");
+      bump(w ? "Se abrió el PDF. Para guardarlo, usá el botón de compartir del navegador."
+             : "Abrilo con el enlace de abajo.", w ? "good" : "bad");
     }else{
       bajarComoArchivo();
     }
