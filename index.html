@@ -73,6 +73,11 @@
   textarea{resize:vertical; min-height:96px; line-height:1.45}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:13px}
   @media (max-width:420px){ .row2{grid-template-columns:1fr} }
+  .nrorow{display:flex; gap:8px; align-items:stretch}
+  .nrorow input{font-variant-numeric:tabular-nums; font-weight:600; letter-spacing:.02em}
+  .nrorow input[readonly]{background:transparent; border-style:dashed; cursor:default}
+  .btn-sm{padding:0 12px; font-size:13px; flex:none}
+
   .money{position:relative}
   .money input{padding-left:24px; font-variant-numeric:tabular-nums}
   .money .cur{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--ink-2)}
@@ -142,17 +147,19 @@
       <div class="pad">
         <p class="eyebrow">Datos del presupuesto</p>
 
-        <div class="row2">
-          <div class="field">
-            <label for="f-nro">N&deg; de presupuesto</label>
-            <input type="text" id="f-nro" value="0001" autocomplete="off">
-            <span class="hint">Sube solo despu&eacute;s de cada descarga.</span>
+        <div class="field">
+          <label for="f-nro">N&deg; de presupuesto</label>
+          <div class="nrorow">
+            <input type="text" id="f-nro" value="51" autocomplete="off" readonly>
+            <button type="button" class="btn-ghost btn-sm" id="btn-ajustar">Ajustar</button>
           </div>
-          <div class="field">
-            <label for="f-serie">Serie</label>
-            <input type="text" id="f-serie" value="" placeholder="A" autocomplete="off" maxlength="6">
-            <span class="hint">Una letra por persona, para no pisarse.</span>
-          </div>
+          <span class="hint" id="nrohint">Se asigna solo y pasa al siguiente despu&eacute;s de cada descarga.</span>
+        </div>
+
+        <div class="field" id="serie-field" hidden>
+          <label for="f-serie">Serie (opcional)</label>
+          <input type="text" id="f-serie" value="" placeholder="A" autocomplete="off" maxlength="6">
+          <span class="hint">Una letra por persona, si varios arman presupuestos desde equipos distintos.</span>
         </div>
 
         <div class="field">
@@ -222,7 +229,7 @@
 
   <footer class="note">
     <span style="display:inline-block;padding:2px 7px;border-radius:5px;background:var(--field);
-          border:1px solid var(--line);font-size:11.5px;font-weight:600;letter-spacing:.04em">v3</span>
+          border:1px solid var(--line);font-size:11.5px;font-weight:600;letter-spacing:.04em">v4</span>
     
     El membrete es el mismo archivo de Word de Team MV, convertido a fondo de p&aacute;gina. El texto se dibuja encima con los mismos m&aacute;rgenes del documento original (3&nbsp;cm laterales, 6&nbsp;cm superior).
   </footer>
@@ -839,7 +846,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   });
 
   // the running number lives in this browser, so the next presupuesto picks up where the last left off
-  var NRO_KEY = "teammv.nro", SERIE_KEY = "teammv.serie";
+  var NRO_KEY = "teammv.nro.v2", SERIE_KEY = "teammv.serie";  // v2: arranca en 51
   function store(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
   function recall(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 
@@ -860,6 +867,25 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     el.addEventListener("change", function(){ paint(); });
   });
   els.nro.addEventListener("change", function(){ store(NRO_KEY, els.nro.value); });
+
+  $("btn-ajustar").addEventListener("click", function(){
+    var abierto = !els.nro.readOnly;
+    if(abierto){
+      store(NRO_KEY, els.nro.value);
+      store(SERIE_KEY, els.serie.value);
+      els.nro.readOnly = true;
+      $("serie-field").hidden = true;
+      this.textContent = "Ajustar";
+      $("nrohint").textContent = "Se asigna solo y pasa al siguiente despu\u00E9s de cada descarga.";
+    }else{
+      els.nro.readOnly = false;
+      $("serie-field").hidden = false;
+      this.textContent = "Listo";
+      $("nrohint").textContent = "Escrib\u00ED con qu\u00E9 n\u00FAmero segu\u00EDs. Desde ah\u00ED sigue solo.";
+      els.nro.focus();
+      els.nro.select();
+    }
+  });
   els.serie.addEventListener("change", function(){ store(SERIE_KEY, els.serie.value); });
   window.addEventListener("resize", fit);
 
